@@ -1,30 +1,12 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use hickory_resolver::{
     config::{ResolverConfig, ResolverOpts},
     AsyncResolver,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::time::Duration;
 
-#[derive(Clone, PartialEq, PartialOrd, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PlcService {
-    pub id: String,
-
-    #[serde(rename = "type")]
-    pub service_type: String,
-
-    pub service_endpoint: String,
-}
-
-#[derive(Clone, PartialEq, PartialOrd, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResolveDid {
-    pub id: String,
-    pub also_known_as: Vec<String>,
-    pub service: Vec<PlcService>,
-}
+use crate::plc::plc_query;
 
 pub async fn resolve_handle_dns(handle: &str) -> Result<String> {
     let lookup_dns = format!("_atproto.{}", handle);
@@ -70,59 +52,6 @@ pub async fn resolve_handle_http(http_client: &reqwest::Client, handle: &str) ->
                 Err(anyhow!("Invalid response from {}", lookup_url))
             }
         })
-}
-
-pub async fn plc_query(
-    http_client: &reqwest::Client,
-    plc_hostname: &str,
-    did: &str,
-) -> Result<(Vec<String>, Vec<String>)> {
-    let url = format!("https://{}/{}", plc_hostname, did);
-
-    let resolved_did: ResolveDid = http_client.get(url).send().await?.json().await?;
-
-    let handles = resolved_did
-        .also_known_as
-        .iter()
-        .map(|value| {
-            if let Some(handle) = value.strip_prefix("at://") {
-                handle.to_string()
-            } else {
-                value.to_string()
-            }
-        })
-        .collect::<Vec<String>>();
-
-    let pds = resolved_did
-        .service
-        .iter()
-        .filter_map(|value| {
-            if value.service_type == "AtprotoPersonalDataServer" {
-                Some(value.service_endpoint.clone())
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<String>>();
-
-    Ok((pds, handles))
-}
-
-pub async fn did_plc_data(
-    http_client: &reqwest::Client,
-    plc_hostname: &str,
-    did: &str,
-) -> Result<serde_json::Value> {
-    let url = format!("https://{}/{}/data", plc_hostname, did);
-
-    http_client
-        .get(url)
-        .send()
-        .await
-        .context("unable to get DID document")?
-        .json()
-        .await
-        .context("unable to deserialize DID document")
 }
 
 pub struct ResolvedHandle {

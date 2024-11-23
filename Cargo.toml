@@ -1,29 +1,31 @@
+
 [package]
 name = "tandem"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "prepare"
-
-[[bin]]
-name = "restore"
+name = "tandem"
 
 [dependencies]
 anyhow = "1.0.93"
-chrono = "0.4.38"
+async-trait = "0.1.83"
+base64 = "0.22.1"
+chrono = { version = "0.4.38", features = ["serde"] }
 dialoguer = { version = "0.11.0", default-features = false, features = ["password"] }
 ecdsa = { version = "0.16.9", features = ["std", "signing", "verifying", "pem", "pkcs8", "der"] }
 elliptic-curve = { version = "0.13.8", features = ["std", "ecdh", "digest", "pem"] }
 futures = "0.3.31"
 hickory-resolver = "0.24.1"
 json-patch = "3.0.1"
-k256 = { version = "0.13.4", features = ["pem", "ecdsa"] }
+k256 = { version = "0.13.4", features = ["pem", "ecdsa", "jwk"] }
 multibase = "0.9.1"
-p256 = { version = "0.13.2", features = ["ecdsa"] }
+p256 = { version = "0.13.2", features = ["ecdsa", "jwk"] }
 rand = "0.8.5"
 reqwest = { version = "0.12.9", features = ["json", "hickory-dns", "rustls-tls"] }
+sec1 = { version = "0.7.3", features = ["pem"] }
 serde = { version = "1.0.215", features = ["alloc", "derive"] }
+serde_ipld_dagcbor = "0.6.1"
 serde_json = { version = "1.0.133", features = ["alloc"] }
 tokio = { version = "1.41.1", default-features = false, features = ["macros", "rt", "rt-multi-thread"] }
 
