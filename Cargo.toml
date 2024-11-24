@@ -21,6 +21,7 @@ json-patch = "3.0.1"
 k256 = { version = "0.13.4", features = ["pem", "ecdsa", "jwk"] }
 multibase = "0.9.1"
 p256 = { version = "0.13.2", features = ["ecdsa", "jwk"] }
+petname = { version = "2.0.2", default-features = false, features = ["default-rng", "default-words"] }
 rand = "0.8.5"
 reqwest = { version = "0.12.9", features = ["json", "hickory-dns", "rustls-tls"] }
 sec1 = { version = "0.7.3", features = ["pem"] }

@@ -19,17 +19,14 @@ struct ResolveDid {
 }
 
 #[derive(Clone, Deserialize)]
-pub struct AuditEntry {
-    pub did: String,
-    pub operation: serde_json::Value,
-    pub cid: String,
-    pub nullified: bool,
-
+struct AuditEntry {
+    operation: serde_json::Value,
+    cid: String,
     #[serde(rename = "createdAt")]
-    pub created_at: DateTime<Utc>,
+    created_at: DateTime<Utc>,
 }
 
-pub async fn plc_query(
+pub(crate) async fn plc_query(
     http_client: &reqwest::Client,
     plc_hostname: &str,
     did: &str,
@@ -65,7 +62,7 @@ pub async fn plc_query(
     Ok((pds, handles))
 }
 
-pub async fn did_plc_data(
+pub(crate) async fn did_plc_data(
     http_client: &reqwest::Client,
     plc_hostname: &str,
     did: &str,
@@ -82,7 +79,7 @@ pub async fn did_plc_data(
         .context("unable to deserialize DID document")
 }
 
-pub async fn did_plc_last_operation(
+pub(crate) async fn did_plc_last_operation(
     http_client: &reqwest::Client,
     plc_hostname: &str,
     did: &str,
@@ -110,7 +107,7 @@ pub async fn did_plc_last_operation(
     Ok((selected.cid, selected.operation))
 }
 
-pub async fn submit_operation(
+pub(crate) async fn submit_operation(
     http_client: &reqwest::Client,
     plc_hostname: &str,
     did: &str,

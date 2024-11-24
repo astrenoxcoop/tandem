@@ -42,16 +42,9 @@ impl TandemAction for ActionAppendHandle<'_> {
             "What is the new handle being added?",
         )?;
 
-        let did_key = crate::crypto::p256::jwk_to_did_key(&jwk)?;
-        println!(
-            "{}",
-            self.theme.green.apply_to("✔ Derived DID key")
-        );
-        println!(
-            "{}",
-            self.theme.white_dim.apply_to(&did_key)
-        );
-
+        let did_key = crate::crypto::jwk_to_did_key(&jwk)?;
+        println!("{}", self.theme.green.apply_to("✔ Derived DID key"));
+        println!("{}", self.theme.white_dim.apply_to(&did_key));
 
         let (last_commit, last_operation) =
             did_plc_last_operation(&self.http_client, &self.plc, &did).await?;
@@ -59,10 +52,7 @@ impl TandemAction for ActionAppendHandle<'_> {
             "{}",
             self.theme.green.apply_to("✔ Retreived last operation")
         );
-        println!(
-            "{}",
-            self.theme.white_dim.apply_to(&last_commit)
-        );
+        println!("{}", self.theme.white_dim.apply_to(&last_commit));
         println!(
             "{}",
             self.theme.white_dim.apply_to(

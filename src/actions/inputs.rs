@@ -5,8 +5,7 @@ use std::str::FromStr;
 
 pub(crate) fn get_jwk_input(theme: &ColorfulTheme) -> Result<JwkEcKey> {
     let secret_jwk = Input::<String>::with_theme(theme)
-        .with_prompt("Secret JWK")
-        .default(r#"{"kty":"EC","crv":"P-256","x":"DfkFQNalRXLDN_NGhP937Pf9ZToyQm8wyqwBHjpH08U","y":"SQqV-D_uxwuv-ZhaMcwG3fu4ap2OzsVTJ0RxSi5sORE","d":"qDE3v8Iy9tNdfUw9F53SoZxpZM03IoZV5znfs2GbSw4"}"#.parse().unwrap())
+        .with_prompt("JWK")
         .interact()?;
 
     JwkEcKey::from_str(&secret_jwk).context("failed to parse JWK")
@@ -15,7 +14,6 @@ pub(crate) fn get_jwk_input(theme: &ColorfulTheme) -> Result<JwkEcKey> {
 pub(crate) fn get_handle_input(theme: &ColorfulTheme, prompt: &str) -> Result<String> {
     let handle = Input::<String>::with_theme(theme)
         .with_prompt(prompt)
-        .default("person.pyroclastic.cloud".parse().unwrap())
         .interact()?;
 
     is_valid_handle(&handle).ok_or(anyhow!("invalid handle"))
@@ -24,7 +22,6 @@ pub(crate) fn get_handle_input(theme: &ColorfulTheme, prompt: &str) -> Result<St
 pub(crate) fn get_did_plc_input(theme: &ColorfulTheme, prompt: &str) -> Result<String> {
     let handle = Input::<String>::with_theme(theme)
         .with_prompt(prompt)
-        .default("did:plc:abcdefg".parse().unwrap())
         .interact()?;
 
     is_valid_did_plc(&handle).ok_or(anyhow!("invalid DID-PLC"))

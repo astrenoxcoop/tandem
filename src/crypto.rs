@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use elliptic_curve::JwkEcKey;
 use serde_json::json;
-use base64::{engine::general_purpose, Engine as _};
 
 #[allow(dead_code)]
 pub(crate) fn validate(multibase_key: &str, signature: &[u8], content: &str) -> Result<()> {
@@ -35,6 +34,7 @@ pub fn sign_operation(jwk: &JwkEcKey, operation: &serde_json::Value) -> Result<s
 
     let signature_str = match jwk.crv() {
         "P-256" => p256::sign_operation(jwk, &serialized_operation),
+        "secp256k1" => k256::sign_operation(jwk, &serialized_operation),
         _ => Err(anyhow!("unsupported curve")),
     }?;
 
@@ -50,18 +50,21 @@ pub fn sign_operation(jwk: &JwkEcKey, operation: &serde_json::Value) -> Result<s
 
     Ok(json!(signed_operation))
 }
+pub(crate) fn jwk_to_did_key(jwk: &JwkEcKey) -> Result<String> {
+    match jwk.crv() {
+        "P-256" => p256::jwk_to_did_key(jwk),
+        "secp256k1" => k256::jwk_to_did_key(jwk),
+        _ => Err(anyhow!("unsupported curve")),
+    }
+}
 
 pub(crate) mod p256 {
 
     use anyhow::Result;
-    use elliptic_curve::{sec1::ToEncodedPoint, JwkEcKey};
-
     use base64::{engine::general_purpose, Engine as _};
+    use elliptic_curve::{sec1::ToEncodedPoint, JwkEcKey};
     use p256::{
-        ecdsa::{
-            signature::Signer,
-            Signature, SigningKey, 
-        },
+        ecdsa::{signature::Signer, Signature, SigningKey},
         SecretKey,
     };
 
@@ -100,13 +103,17 @@ pub(crate) mod p256 {
     }
 }
 
-pub mod k256 {
+pub(crate) mod k256 {
 
     use anyhow::Result;
-    use elliptic_curve::sec1::ToEncodedPoint;
-    use k256;
+    use base64::{engine::general_purpose, Engine as _};
+    use elliptic_curve::{sec1::ToEncodedPoint, JwkEcKey};
+    use k256::{
+        ecdsa::{signature::Signer, Signature, SigningKey},
+        SecretKey,
+    };
 
-    pub fn gen_key() -> Result<(String, String)> {
+    pub(crate) fn gen_key() -> Result<(String, String)> {
         let secret_key: k256::SecretKey = k256::SecretKey::random(&mut rand::thread_rng());
 
         let secret_jwk = secret_key.to_jwk_string().to_string();
@@ -119,6 +126,25 @@ pub mod k256 {
         let encoded_public_key = multibase::encode(multibase::Base::Base58Btc, full);
 
         Ok((secret_jwk, encoded_public_key))
+    }
+
+    pub(crate) fn jwk_to_did_key(jwk: &JwkEcKey) -> Result<String> {
+        let secret_key: SecretKey = jwk.try_into()?;
+        let public_key = secret_key.public_key();
+        let encoded_point = public_key.to_encoded_point(true);
+
+        let full = [&[0xe7, 0x01], encoded_point.as_bytes()].concat();
+
+        let encoded_public_key = multibase::encode(multibase::Base::Base58Btc, full);
+
+        Ok(encoded_public_key)
+    }
+
+    pub(crate) fn sign_operation(jwk: &JwkEcKey, payload: &[u8]) -> Result<String> {
+        let secret_key: SecretKey = jwk.try_into()?;
+        let signing_key: SigningKey = secret_key.into();
+        let signature: Signature = signing_key.try_sign(payload)?;
+        Ok(general_purpose::URL_SAFE_NO_PAD.encode(signature.to_bytes()))
     }
 }
 

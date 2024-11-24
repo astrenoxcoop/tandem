@@ -1,17 +1,13 @@
 use anyhow::{Context, Result};
 use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, Input, Select};
-use elliptic_curve::JwkEcKey;
-use json_patch::Patch;
-use serde_json::{from_value, json};
-use std::str::FromStr;
 use std::{env, process::ExitCode};
-use tandem::actions::{get_action, Theme};
+use tandem::actions::{get_action, Theme, SUPPORTED_ACTIONS};
 
 #[tokio::main]
 async fn main() -> ExitCode {
     if let Err(err) = real_main().await {
         let red_bold = Style::new().red().bold();
-        println!("{}: {}", red_bold.apply_to("Error"), err);
+        println!("{}: {:?}", red_bold.apply_to("Error"), err);
         return ExitCode::FAILURE;
     }
 
@@ -73,24 +69,15 @@ async fn real_main() -> Result<()> {
         .build()
         .context("failed to create HTTP client")?;
 
-    println!(
-        "{}",
-        theme
-            .yellow_bold
-            .apply_to("Please provide your @handle and password.")
-    );
-
     let plc = Input::<String>::with_theme(theme.colorful_theme)
         .with_prompt("PLC Directory")
         .default("plc.pyroclastic.cloud".parse().unwrap())
         .interact()?;
 
-    let supported_operations = &["Install Tandem Key", "Append Handle"];
-
     let selected_operation = Select::with_theme(theme.colorful_theme)
         .with_prompt("Supported Operations")
         .default(0)
-        .items(&supported_operations[..])
+        .items(&SUPPORTED_ACTIONS[..])
         .interact()?;
 
     let action = get_action(selected_operation, &theme, &http_client, &plc)?;

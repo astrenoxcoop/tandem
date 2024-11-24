@@ -7,8 +7,6 @@ use serde_json::json;
 pub struct PdsClient {
     pub http_client: reqwest::Client,
     pub pds: String,
-    pub did: String,
-    pub handle: String,
     pub access_jwt: String,
 }
 
@@ -18,8 +16,43 @@ enum WrappedCredentialResponse {
     CredentialResponse {
         #[serde(rename = "accessJwt")]
         access_jwt: String,
-        handle: String,
+        _handle: String,
+        _did: String,
+    },
+
+    #[serde(untagged)]
+    Other {
+        #[serde(flatten)]
+        extra: HashMap<String, serde_json::Value>,
+    },
+}
+
+#[derive(serde::Deserialize)]
+enum WrappedDescribeServerResponse {
+    #[serde(untagged)]
+    DescribeServerResponse {
         did: String,
+        #[serde(rename = "inviteCodeRequired")]
+        invite_code_required: bool,
+        #[serde(rename = "availableUserDomains")]
+        available_user_domains: Vec<String>,
+    },
+
+    #[serde(untagged)]
+    Other {
+        #[serde(flatten)]
+        extra: HashMap<String, serde_json::Value>,
+    },
+}
+
+#[derive(serde::Deserialize)]
+enum WrappedCreateAccountResponse {
+    #[serde(untagged)]
+    CreateAccountResponse {
+        did: String,
+        handle: String,
+        #[serde(rename = "accessJwt")]
+        access_jwt: String,
     },
 
     #[serde(untagged)]
@@ -55,26 +88,16 @@ impl PdsClient {
             .json()
             .await?;
 
-        if let WrappedCredentialResponse::Other { extra } = response {
-            println!("Unexpected response from PDS: {:?}", extra);
-            return Err(anyhow!("Unexpected response from PDS"));
-        }
-
-        let (handle, did, access_jwt) = match response {
-            WrappedCredentialResponse::CredentialResponse {
-                handle,
-                did,
-                access_jwt,
-                ..
-            } => (handle, did, access_jwt),
-            _ => unreachable!(),
-        };
+        let access_jwt = match response {
+            WrappedCredentialResponse::CredentialResponse { access_jwt, .. } => Ok(access_jwt),
+            WrappedCredentialResponse::Other { extra } => {
+                Err(anyhow!("Unexpected response from PDS: {:?}", extra))
+            }
+        }?;
 
         Ok(Self {
             http_client: http_client.clone(),
             pds: pds.to_string(),
-            handle,
-            did,
             access_jwt,
         })
     }
@@ -136,5 +159,89 @@ impl PdsClient {
             .await
             .map(|_| ())
             .map_err(|err| err.into())
+    }
+}
+
+pub(crate) async fn describe_server(
+    http_client: &reqwest::Client,
+    pds_hostname: &str,
+) -> Result<(String, bool, Vec<String>)> {
+    let uri = format!(
+        "https://{}/xrpc/com.atproto.server.describeServer",
+        pds_hostname
+    );
+    let wrapped_response: WrappedDescribeServerResponse =
+        http_client.get(uri).send().await?.json().await?;
+
+    match wrapped_response {
+        WrappedDescribeServerResponse::DescribeServerResponse {
+            did,
+            invite_code_required,
+            available_user_domains,
+        } => Ok((did, invite_code_required, available_user_domains)),
+        WrappedDescribeServerResponse::Other { extra } => {
+            println!("Unexpected response from PDS: {:?}", extra);
+            Err(anyhow!("Unexpected response from PDS"))
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
+struct CreateAccountRequest {
+    handle: String,
+    email: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    did: Option<String>,
+    #[serde(rename = "inviteCode", skip_serializing_if = "Option::is_none")]
+    invite_code: Option<String>,
+    password: String,
+    #[serde(rename = "recoveryKey")]
+    recovery_key: String,
+}
+
+// TODO: Use a request object here.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn create_account(
+    http_client: &reqwest::Client,
+    pds_hostname: &str,
+    handle: &str,
+    password: &str,
+    email: &str,
+    recovery_key: &str,
+    invite_code: Option<String>,
+    did: Option<String>,
+) -> Result<(String, String, String)> {
+    let uri = format!(
+        "https://{}/xrpc/com.atproto.server.createAccount",
+        pds_hostname
+    );
+
+    let payload = CreateAccountRequest {
+        handle: handle.to_string(),
+        email: email.to_string(),
+        did,
+        invite_code,
+        password: password.to_string(),
+        recovery_key: recovery_key.to_string(),
+    };
+
+    let wrapped_response: WrappedCreateAccountResponse = http_client
+        .post(uri)
+        .json(&payload)
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    match wrapped_response {
+        WrappedCreateAccountResponse::CreateAccountResponse {
+            did,
+            handle,
+            access_jwt,
+        } => Ok((did, handle, access_jwt)),
+        WrappedCreateAccountResponse::Other { extra } => {
+            println!("Unexpected response from PDS: {:?}", extra);
+            Err(anyhow!("Unexpected response from PDS"))
+        }
     }
 }
